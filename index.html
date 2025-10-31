@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PFCトラッカー - 食事入力</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        .input-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="text"], input[type="number"] { padding: 8px; width: 200px; margin-right: 10px; }
+        button { padding: 10px 15px; cursor: pointer; }
+        #result { margin-top: 20px; padding: 15px; border: 1px solid #ccc; background-color: #f9f9f9; }
+        .pfc-data div { margin-top: 5px; font-size: 1.1em; }
+        .error { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h1>食事データ入力</h1>
+
+    <div id="status-message" class="error"></div>
+
+    <div class="input-group">
+        <label for="mealName">食事名 (例: 鶏むね肉, ご飯)</label>
+        <input type="text" id="mealName" placeholder="食べたものを入力" required>
+    </div>
+
+    <div class="input-group">
+        <label for="weight">重量 (グラム)</label>
+        <input type="number" id="weight" placeholder="g" required min="1">
+    </div>
+
+    <button onclick="trackMeal()">記録する</button>
+
+    <div id="result">
+        <h2>最新の記録結果</h2>
+        <div id="api-response-message">--</div>
+        <div class="pfc-data">
+            <div>**カロリー:** <span id="calories-display">0</span> kcal</div>
+            <div>**P (タンパク質):** <span id="protein-display">0.0</span> g</div>
+            <div>**F (脂質):** <span id="fat-display">0.0</span> g</div>
+            <div>**C (炭水化物):** <span id="carbs-display">0.0</span> g</div>
+        </div>
+    </div>
+
+    <script>
+        // バックエンドサーバーのURL
+        const BACKEND_URL = 'http://localhost:3000/api/track-meal';
+
+        async function trackMeal() {
+            const meal = document.getElementById('mealName').value.trim();
+            const weight = document.getElementById('weight').value;
+            const statusMessage = document.getElementById('status-message');
+            const responseMessage = document.getElementById('api-response-message');
+            
+            // 入力チェック
+            if (!meal || !weight || weight <= 0) {
+                statusMessage.textContent = 'エラー: 食事名と有効な重量を入力してください。';
+                return;
+            }
+            statusMessage.textContent = ''; // エラーをクリア
+            responseMessage.textContent = 'データをサーバーに送信中...';
+
+            try {
+                // バックエンドサーバーへのPOSTリクエスト
+                const response = await fetch(BACKEND_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    // 入力データをJSON形式で送信
+                    body: JSON.stringify({ meal: meal, weight: Number(weight) })
+                });
+
+                const data = await response.json();
+                
+                // サーバーエラーの処理
+                if (!response.ok) {
+                    responseMessage.textContent = 'エラー: ' + (data.error || 'サーバーエラーが発生しました。');
+                    console.error('API連携エラー:', data.error);
+                    return;
+                }
+
+                // 成功時の処理
+                responseMessage.textContent = data.message;
+                
+                // PFCとカロリーを画面に表示
+                document.getElementById('calories-display').textContent = data.calories.toFixed(0);
+                document.getElementById('protein-display').textContent = data.pfc.protein;
+                document.getElementById('fat-display').textContent = data.pfc.fat;
+                document.getElementById('carbs-display').textContent = data.pfc.carbs;
+                
+            } catch (error) {
+                // ネットワークエラーなどの処理
+                responseMessage.textContent = '重大なエラー: サーバーとの通信に失敗しました。サーバーが起動しているか確認してください。';
+                console.error('通信エラー:', error);
+            }
+        }
+    </script>
+</body>
+</html>
